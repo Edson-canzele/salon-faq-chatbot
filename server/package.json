@@ -1,14 +1,17 @@
+
 {
   "name": "server",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Express backend for the Salon FAQ Chatbot demo",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "echo \"No automated tests configured yet\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^18.0.8",

@@ -4,10 +4,10 @@
   "version": "1.0.0",
   "description": "Express backend for the Salon FAQ Chatbot demo",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "test": "echo \"No automated tests configured yet\""
+"scripts": {
+  "start": "node server.js",
+  "dev": "node --watch server.js",
+  "test": "node --test"
   },
   "keywords": [],
   "author": "",

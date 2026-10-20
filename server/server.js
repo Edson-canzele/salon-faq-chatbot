@@ -9,10 +9,6 @@ const faq = require("./faq");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
 const HUMAN_CONTACT_URL = "https://wa.me/27781656717";
 const MODEL = "openai/gpt-oss-20b";
 const MAX_HISTORY_MESSAGES = 10;
@@ -21,68 +17,72 @@ app.use(cors());
 app.use(express.json());
 
 function validateEnvironment() {
-  const required = [
-    "GROQ_API_KEY",
-    "WHATSAPP_TOKEN",
-    "WHATSAPP_PHONE_NUMBER_ID",
-    "WHATSAPP_VERIFY_TOKEN",
-  ];
-
-  const missing = required.filter((key) => !process.env[key]);
-
-  if (missing.length > 0) {
+  if (!process.env.GROQ_API_KEY) {
     throw new Error(
-      `Missing required environment variables: ${missing.join(", ")}`
+      "Missing required environment variable: GROQ_API_KEY"
     );
   }
 }
 
+function isWhatsAppConfigured() {
+  return Boolean(
+    process.env.WHATSAPP_TOKEN &&
+      process.env.WHATSAPP_PHONE_NUMBER_ID &&
+      process.env.WHATSAPP_VERIFY_TOKEN
+  );
+}
+
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
+
 function getFaqText() {
   if (!Array.isArray(faq)) {
-    throw new Error("FAQ must be an array of question/answer objects.");
+    throw new Error(
+      "FAQ must be an array of question/answer objects."
+    );
   }
 
   return faq
     .map((item, index) => {
-      if (!item.question || !item.answer) {
-        throw new Error(`Invalid FAQ entry at position ${index + 1}.`);
+      if (
+        !item ||
+        typeof item.question !== "string" ||
+        !item.question.trim() ||
+        typeof item.answer !== "string" ||
+        !item.answer.trim()
+      ) {
+        throw new Error(
+          `Invalid FAQ entry at position ${index + 1}.`
+        );
       }
 
-      return `${index + 1}. Question: ${item.question}\nAnswer: ${item.answer}`;
+      return (
+        `${index + 1}. Question: ${item.question}\n` +
+        `Answer: ${item.answer}`
+      );
     })
     .join("\n\n");
 }
 
-/*
- * Detect requests to speak with a person.
- */
 function needsHuman(message = "") {
   return /\b(speak\s+to|talk\s+to|speak\s+with|talk\s+with|real person|human agent|team member|customer service|representative|live agent|connect me to|someone from the salon|someone from the team|speak to someone)\b/i.test(
     message
   );
 }
 
-/*
- * Detect answers that indicate missing information.
- */
 function indicatesMissingInformation(reply = "") {
   return /\b(don't have|do not have|not available|not listed|aren't listed|are not listed|isn't listed|is not listed|not sure|unsure|don't know|do not know|can't confirm|cannot confirm|unable to confirm|no information|can't provide|cannot provide|not provided|don't have the exact|do not have the exact|not sure of the exact)\b/i.test(
     reply
   );
 }
 
-/*
- * Detect answers that direct the customer to the team.
- */
 function suggestsHumanAssistance(reply = "") {
   return /\b(contact our team|contact the team|contact the salon|reach out to our team|reach out to the team|ask our team|ask the team|check with our team|check with the team|let our team know|let the team know|our team can help|the team can help|our team will help|the team will help|give you a quote|confirm before your visit|confirm before booking|forward your request|get in touch with you|help you with your booking|contact our staff)\b/i.test(
     reply
   );
 }
 
-/*
- * Remove Markdown formatting from WhatsApp URLs.
- */
 function normalizeContactLink(text = "") {
   return String(text)
     .replace(
@@ -92,14 +92,6 @@ function normalizeContactLink(text = "") {
     .trim();
 }
 
-/*
- * Central contact-link policy.
- *
- * - Normal FAQ answers remain unchanged.
- * - Unknown information includes the contact URL.
- * - Human requests always include the contact URL.
- * - Existing links are not duplicated.
- */
 function ensureHumanContactLink(reply, userMessage = "") {
   const text = normalizeContactLink(reply);
 
@@ -155,10 +147,6 @@ STRICT RULES:
     the contact URL when needed.
 `;
 
-/*
- * In-memory WhatsApp conversation history.
- * It resets when the server restarts.
- */
 const whatsappConversations = new Map();
 
 function getConversation(phone) {
@@ -180,9 +168,6 @@ function saveConversationMessage(phone, role, content) {
   );
 }
 
-/*
- * Generate an AI response.
- */
 async function generateReply(userMessage, history = []) {
   const safeHistory = Array.isArray(history)
     ? history
@@ -221,9 +206,8 @@ async function generateReply(userMessage, history = []) {
   return reply.trim();
 }
 
-/*
- * Basic endpoints.
- */
+// Basic routes
+
 app.get("/", (req, res) => {
   res.send("Salon FAQ chatbot server is running.");
 });
@@ -239,9 +223,8 @@ app.get("/api/faq", (req, res) => {
   res.json(faq);
 });
 
-/*
- * Web application chat endpoint.
- */
+// Web chat API
+
 app.post("/api/chat", async (req, res) => {
   try {
     const { message, history = [] } = req.body || {};
@@ -254,7 +237,10 @@ app.post("/api/chat", async (req, res) => {
 
     const userMessage = message.trim();
 
-    const rawReply = await generateReply(userMessage, history);
+    const rawReply = await generateReply(
+      userMessage,
+      history
+    );
 
     const reply = ensureHumanContactLink(
       rawReply,
@@ -274,10 +260,15 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-/*
- * Verify Meta webhook.
- */
+// WhatsApp webhook verification
+
 app.get("/webhook", (req, res) => {
+  if (!process.env.WHATSAPP_VERIFY_TOKEN) {
+    return res
+      .status(503)
+      .send("WhatsApp integration is not configured.");
+  }
+
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
@@ -293,10 +284,15 @@ app.get("/webhook", (req, res) => {
   return res.sendStatus(403);
 });
 
-/*
- * Send a plain-text message through WhatsApp Cloud API.
- */
+// Send a WhatsApp text message
+
 async function sendWhatsAppMessage(to, message) {
+  if (!isWhatsAppConfigured()) {
+    throw new Error(
+      "WhatsApp integration is not configured."
+    );
+  }
+
   const version =
     process.env.WHATSAPP_GRAPH_API_VERSION || "v25.0";
 
@@ -338,7 +334,8 @@ async function sendWhatsAppMessage(to, message) {
                 message: responseData.error.message,
                 type: responseData.error.type,
                 code: responseData.error.code,
-                error_subcode: responseData.error.error_subcode,
+                error_subcode:
+                  responseData.error.error_subcode,
                 fbtrace_id: responseData.error.fbtrace_id,
               }
             : null,
@@ -354,10 +351,16 @@ async function sendWhatsAppMessage(to, message) {
   return responseData;
 }
 
-/*
- * Process an incoming WhatsApp message.
- */
+// Process an incoming WhatsApp message
+
 async function processWhatsAppMessage(message) {
+  if (!isWhatsAppConfigured()) {
+    console.warn(
+      "WhatsApp integration is disabled: credentials are missing."
+    );
+    return;
+  }
+
   const from = message.from;
   const userMessage = message.text?.body?.trim();
 
@@ -384,7 +387,10 @@ async function processWhatsAppMessage(message) {
       userMessage
     );
   } catch (error) {
-    console.error("WhatsApp AI reply error:", error.message);
+    console.error(
+      "WhatsApp AI reply error:",
+      error.message
+    );
 
     finalReply =
       "I'm sorry, I'm having trouble answering right now. " +
@@ -400,12 +406,18 @@ async function processWhatsAppMessage(message) {
   console.log("WhatsApp reply sent successfully.");
 }
 
-/*
- * Receive WhatsApp Cloud API webhook events.
- */
+// Receive WhatsApp webhook events
+
 app.post("/webhook", (req, res) => {
-  // Acknowledge Meta before processing the message.
+  // Acknowledge the webhook request promptly.
   res.sendStatus(200);
+
+  if (!isWhatsAppConfigured()) {
+    console.warn(
+      "WhatsApp webhook received, but integration is not configured."
+    );
+    return;
+  }
 
   const body = req.body;
 
@@ -433,9 +445,8 @@ app.post("/webhook", (req, res) => {
   }
 });
 
-/*
- * Start the server.
- */
+// Start the server
+
 try {
   validateEnvironment();
 
@@ -443,6 +454,15 @@ try {
     console.log(
       `Salon chatbot server running on port ${PORT}`
     );
+
+    if (isWhatsAppConfigured()) {
+      console.log("WhatsApp integration is configured.");
+    } else {
+      console.log(
+        "WhatsApp integration is disabled. " +
+          "The web chatbot remains available."
+      );
+    }
   });
 } catch (error) {
   console.error("Server startup error:", error.message);

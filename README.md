@@ -1,106 +1,165 @@
 # Salon FAQ Chatbot
 
-A simple, AI-powered FAQ chatbot for a fictional hair salon. The project demonstrates conversational customer support through a web interface and WhatsApp, using Groq and the Meta WhatsApp Cloud API.
+A conversational FAQ chatbot for a fictional hair salon, built to demonstrate AI-assisted customer support through a web interface and WhatsApp.
+
+The project uses a React/Vite frontend, an Express backend, the Groq API for language-model responses, and the Meta WhatsApp Cloud API for WhatsApp messaging.
 
 ## Features
 
-- Answers salon-related questions using a predefined FAQ.
-- Provides consistent responses about services and illustrative starting prices.
-- Uses conversation history to understand follow-up questions.
-- Avoids inventing unavailable information, such as opening hours, address, and payment methods.
-- Directs customers to the salon team when human assistance is needed.
+- Answers questions about salon services and illustrative starting prices using a predefined FAQ.
+- Uses recent conversation history to interpret follow-up questions.
+- Avoids confirming information that is not available in the FAQ, such as opening hours, address, and payment methods.
+- Provides a WhatsApp contact link when human assistance or confirmation is needed.
 - Supports a web chat interface and WhatsApp messaging.
-- Keeps API credentials in environment variables rather than source code.
+- Keeps API credentials in environment variables instead of frontend source code.
 
 ## Technology Stack
 
 - **Frontend:** React and Vite
 - **Backend:** Node.js and Express
-- **AI:** Groq API
+- **AI:** Groq API (`openai/gpt-oss-20b`)
 - **Messaging:** Meta WhatsApp Cloud API
-- **Configuration:** Environment variables using dotenv
+- **Configuration:** dotenv
 
 ## Project Structure
 
 ```text
 salon-faq-chatbot/
-├── src/
-│   └── App.jsx
+├── client/
+│   ├── src/
+│   ├── package.json
+│   ├── README.md
+│   └── ...
 ├── server/
-│   └── faq.js
-├── server.js
-├── package.json
+│   ├── faq.js
+│   ├── server.js
+│   └── package.json
 ├── .env.example
 ├── .gitignore
 └── README.md
 ```
 
-The structure above is illustrative. Check the actual project files and adjust the paths if your local structure differs.
+## Requirements
+
+- Node.js 22 or later recommended
+- npm
+- A Groq API key
+- Meta WhatsApp Cloud API credentials to test WhatsApp integration
 
 ## Getting Started
 
-### Prerequisites
+### 1. Install frontend dependencies
 
-- Node.js and npm
-- A Groq API key
-- A Meta developer account and WhatsApp Cloud API configuration for WhatsApp integration
-
-### 1. Install dependencies
-
-Open a terminal in the project directory and run:
+Open a terminal in the project directory:
 
 ```bash
+cd client
 npm install
 ```
 
-If the backend has a separate `package.json`, install its dependencies in the backend directory as well.
+### 2. Install backend dependencies
 
-### 2. Configure environment variables
+Open another terminal in the project directory:
 
-Create a local `.env` file using `.env.example` as a reference.
+```bash
+cd server
+npm install
+```
 
-Add your own credentials and configuration values locally. Never commit `.env` or share API tokens publicly.
+### 3. Configure environment variables
 
-### 3. Start the application
+Create a private file named `.env` inside the `server` directory.
 
-Use the scripts defined in `package.json`. For example, if the project defines `dev` and `server` scripts, start the frontend and backend in separate terminals using those scripts.
+Use the variable names from the root `.env.example` file:
 
-The frontend and backend must both be running for the complete local experience.
+```dotenv
+PORT=3000
+GROQ_API_KEY=your_groq_api_key
+WHATSAPP_TOKEN=your_whatsapp_access_token
+WHATSAPP_PHONE_NUMBER_ID=your_whatsapp_phone_number_id
+WHATSAPP_VERIFY_TOKEN=your_custom_verification_token
+WHATSAPP_GRAPH_API_VERSION=v25.0
+```
 
-### 4. Configure WhatsApp
+Replace the example values with your own credentials. These examples are placeholders, not working credentials.
 
-To receive WhatsApp messages, configure the Meta WhatsApp Cloud API webhook to point to your publicly accessible backend URL.
+**Never commit `server/.env` or share its contents publicly.** The current backend validates the WhatsApp variables during startup, even if you only want to test the web chat.
 
-Set the webhook callback URL and verification token in the Meta developer dashboard, subscribe to the appropriate WhatsApp messaging events, and configure the required environment variables.
+### 4. Start the backend
 
-For local development, a tunnelling service can expose the backend temporarily. Do not publish access tokens or private webhook configuration values.
+From the `server` directory, run:
 
-## FAQ Behaviour
+```bash
+npm start
+```
 
-The chatbot uses a predefined FAQ as its source of truth. When information is unavailable, it should acknowledge the limitation and direct the user to the salon team instead of inventing details.
+The backend uses port `3000` by default.
 
-The demo tests include service and price questions, follow-up questions that depend on conversation history, unknown information, requests for human assistance, and attempts to override the FAQ.
+Health check:
 
-## Demo Data Notice
+`http://localhost:3000/api/health`
 
-This project uses a fictional salon. All service prices are illustrative starting prices created for demonstration purposes and are not verified commercial prices. Opening hours, location, and payment policies are intentionally not confirmed.
+### 5. Start the frontend
 
-Replace the demo information with approved business information before using this project for a real salon.
+In a separate terminal, from the `client` directory, run:
 
-## Security Notes
+```bash
+npm run dev
+```
 
-- Never commit `.env` or real API credentials.
-- Keep `.env.example` free of secrets.
-- Do not expose access tokens in frontend code, screenshots, logs, or documentation.
-- Rotate any credential that is accidentally exposed.
-- Use appropriate access controls and webhook verification for production deployments.
+Open the local URL printed by Vite, usually:
+
+`http://localhost:5173`
+
+Keep both terminals running while testing the application.
+
+## WhatsApp Cloud API Setup
+
+To receive WhatsApp messages, configure a Meta webhook that can reach the backend.
+
+- Webhook callback path: `/webhook`
+- Verification token: the value configured in `WHATSAPP_VERIFY_TOKEN`
+- Subscribe to the appropriate WhatsApp message events in Meta.
+- Ensure the backend is publicly reachable for webhook delivery.
+
+For local testing, a tunnelling service can expose the backend temporarily. The tunnel URL may change, so the callback URL may need updating.
+
+Never publish WhatsApp access tokens or private environment files.
+
+## FAQ and Demo Data
+
+The salon is fictional. All service prices are illustrative starting prices for demonstration purposes and are not verified commercial prices.
+
+Opening hours, the salon address, and payment policies are intentionally not confirmed in the FAQ.
+
+Replace the demo information with approved business information before using this chatbot for a real business.
+
+## Testing
+
+Manual WhatsApp tests have covered:
+
+- Questions about listed services and illustrative prices.
+- Follow-up questions that refer to a previously mentioned service.
+- Requests for unavailable details, including opening hours and payment methods.
+- Requests to speak to a person.
+- Questions outside the salon's scope.
+- Attempts to override the FAQ with unsupported information.
+
+These are manual demonstration tests, not a comprehensive automated test suite.
 
 ## Limitations
 
-- Conversation history may be stored in memory and can be lost when the backend restarts.
-- The WhatsApp integration requires valid Meta configuration and an accessible webhook.
-- The demo FAQ and prices must be reviewed before real-world use.
-- Production deployment requires additional monitoring, error handling, privacy review, and security hardening.
+- WhatsApp conversation history is stored in server memory and is lost when the backend restarts.
+- WhatsApp integration requires valid Meta credentials and a reachable webhook.
+- Prices and salon details are demo data and must be verified before real-world use.
+- Production use would require additional security, privacy, monitoring, and reliability review.
+
+## Security
+
+- Never commit `.env`, `server/.env`, API keys, or access tokens.
+- Keep `.env.example` free of real credentials.
+- Do not put private API keys in frontend code.
+- If a secret is accidentally published, revoke it and issue a replacement. Removing it from the latest version does not necessarily remove it from Git history.
 
 ## Purpose
 
